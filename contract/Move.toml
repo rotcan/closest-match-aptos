@@ -1,0 +1,10 @@
+[package]
+name = "ClosestMatch"
+version = "0.0.1"
+
+[dependencies]
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "mainnet" }
+
+[addresses]
+aptos_framework = "0x1"
+closest_match="0x123"
