@@ -16,7 +16,9 @@ module closest_match::mtc_coin {
     const COIN_DECIMALS: u8 = 9;
     const COIN_URI: vector<u8> = b"https://ipfs.io/ipfs/QmUHhBAnafJmywjSxFsZWobTC636vZfVTMsw6kzNHg7PVA";
     const PROJECT_URI: vector<u8> = b"https://rotcan.github.io/";
-
+    
+    const E_ADMIN_ADDRESS_MISMATCH: u64=1;
+ 
     struct MtcRef has key{
         mint_ref: option::Option<fungible_asset::MintRef>,
         burn_ref: option::Option<fungible_asset::BurnRef>,
@@ -26,6 +28,9 @@ module closest_match::mtc_coin {
     struct MtcToken has key {}
 
     fun init_module(admin: &signer){
+        let admin_address=signer::address_of(admin);
+        assert!(@admin_addr==admin_address, error::permission_denied(E_ADMIN_ADDRESS_MISMATCH));
+
         let creator_ref = object::create_named_object(admin, COIN_TITLE);
         let object_signer = object::generate_signer(&creator_ref);
 
@@ -59,6 +64,8 @@ module closest_match::mtc_coin {
     }
 
     public entry fun transfer_to(from: &signer, coin_address: address, to: address, amount: u64) {
+        // std::debug::print<u8>(&62);
+        // std::debug::print<address>(&coin_address);
         let mtc_obj = object::address_to_object<MtcToken>(coin_address);
 
         primary_fungible_store::transfer(from, mtc_obj, to, amount);
@@ -70,20 +77,40 @@ module closest_match::mtc_coin {
         primary_fungible_store::balance(wallet, mtc_obj)
     }
 
+    public fun get_coin_address(): address{
+        object::create_object_address(&@admin_addr, COIN_TITLE)
+    }
+
     #[test_only]
     use aptos_framework::account::create_account_for_test;
     #[test_only]
     public fun setup_test(admin: &signer){
-        create_account_for_test(signer::address_of(admin));
         init_module(admin);
     }
-    #[test(admin=@0xfed,bob=@0x123, alice=@0x234)]
+
+    #[test_only]
+    public fun mint_coins(admin: &signer,to_addr: address, val: u64) acquires MtcRef{
+        //let coin_address=object::create_object_address(&signer::address_of(admin),COIN_TITLE);
+        //std::debug::print<address>(&coin_address);
+        mint_to(admin, to_addr, val);
+    }
+
+    #[test_only]
+    public fun get_balance(admin_address: address, to_addr: address): u64{
+        let coin_address = object::create_object_address(&admin_address, COIN_TITLE);
+        let mtc_obj = object::address_to_object<MtcToken>(coin_address);
+        primary_fungible_store::balance(to_addr,mtc_obj)
+    }
+
+    #[test(admin=@0x123,bob=@0x345, alice=@0x234)]
     public fun test_transfer(admin: &signer, bob: &signer, alice: &signer) acquires MtcRef{
+        create_account_for_test(signer::address_of(admin));
         create_account_for_test(signer::address_of(bob));
         create_account_for_test(signer::address_of(alice));
         setup_test(admin);
         let admin_address = signer::address_of(admin);
         let coin_address = object::create_object_address(&admin_address, COIN_TITLE);
+        // std::debug::print<address>(&coin_address);
         //let mtc_ref=borrow_global<MtcRef>(admin_address);
         let mtc_obj = object::address_to_object<MtcToken>(coin_address);
         //primary_fungible_store::mint(option::borrow(&mtc_ref.mint_ref),admin_address,100);
