@@ -1,7 +1,7 @@
 {
   "files": {
     "main.css": "/closest-match-aptos/static/css/main.a58627d7.css",
-    "main.js": "/closest-match-aptos/static/js/main.e2bae1cf.js",
+    "main.js": "/closest-match-aptos/static/js/main.1521d90b.js",
     "static/js/453.c49a0eed.chunk.js": "/closest-match-aptos/static/js/453.c49a0eed.chunk.js",
     "static/media/back.jpg": "/closest-match-aptos/static/media/back.13117d009f8e6974b2a9.jpg",
     "static/media/22.png": "/closest-match-aptos/static/media/22.1e849b9251f1cca97075.png",
@@ -58,11 +58,11 @@
     "static/media/27.png": "/closest-match-aptos/static/media/27.a51b192d2f2ba1fc1d53.png",
     "index.html": "/closest-match-aptos/index.html",
     "main.a58627d7.css.map": "/closest-match-aptos/static/css/main.a58627d7.css.map",
-    "main.e2bae1cf.js.map": "/closest-match-aptos/static/js/main.e2bae1cf.js.map",
+    "main.1521d90b.js.map": "/closest-match-aptos/static/js/main.1521d90b.js.map",
     "453.c49a0eed.chunk.js.map": "/closest-match-aptos/static/js/453.c49a0eed.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.a58627d7.css",
-    "static/js/main.e2bae1cf.js"
+    "static/js/main.1521d90b.js"
   ]
 }
