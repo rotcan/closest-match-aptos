@@ -21,10 +21,9 @@ const MatchList=()=>{
         if(!account){
             alert("Please connect wallet!");
         }
-        if(aptosClient && account && !data){
+        if(aptosClient && account && data.length===0){
             setLoading(true);
             const res=await aptosClient.getMatchesByOwner({owner: account.address});
-            // console.log("res",res)
             if(res){
                 setData(res);
                
@@ -40,8 +39,9 @@ const MatchList=()=>{
  
 
     useEffect(()=>{
-        loadData();
-    },[])
+        if(aptosClient && account)
+            loadData();
+    },[aptosClient,account])
 
     return (
         <Flex vertical className="game-form list-form">
