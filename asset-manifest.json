@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/closest-match-aptos/static/css/main.a47c46d8.css",
-    "main.js": "/closest-match-aptos/static/js/main.2e1f6832.js",
+    "main.css": "/closest-match-aptos/static/css/main.a58627d7.css",
+    "main.js": "/closest-match-aptos/static/js/main.2f93f0d1.js",
     "static/js/453.c49a0eed.chunk.js": "/closest-match-aptos/static/js/453.c49a0eed.chunk.js",
     "static/media/back.jpg": "/closest-match-aptos/static/media/back.13117d009f8e6974b2a9.jpg",
     "static/media/22.png": "/closest-match-aptos/static/media/22.1e849b9251f1cca97075.png",
@@ -57,12 +57,12 @@
     "static/media/40.png": "/closest-match-aptos/static/media/40.c2cb81fb3d816683e15a.png",
     "static/media/27.png": "/closest-match-aptos/static/media/27.a51b192d2f2ba1fc1d53.png",
     "index.html": "/closest-match-aptos/index.html",
-    "main.a47c46d8.css.map": "/closest-match-aptos/static/css/main.a47c46d8.css.map",
-    "main.2e1f6832.js.map": "/closest-match-aptos/static/js/main.2e1f6832.js.map",
+    "main.a58627d7.css.map": "/closest-match-aptos/static/css/main.a58627d7.css.map",
+    "main.2f93f0d1.js.map": "/closest-match-aptos/static/js/main.2f93f0d1.js.map",
     "453.c49a0eed.chunk.js.map": "/closest-match-aptos/static/js/453.c49a0eed.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.a47c46d8.css",
-    "static/js/main.2e1f6832.js"
+    "static/css/main.a58627d7.css",
+    "static/js/main.2f93f0d1.js"
   ]
 }
