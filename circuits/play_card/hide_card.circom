@@ -1,8 +1,8 @@
 pragma circom 2.1.6;
 
-include "circomlib/poseidon.circom";
-include "circomlib/comparators.circom";
-include "circomlib/multiplexer.circom";
+include "../../node_modules/circomlib/circuits/poseidon.circom";
+include "../../node_modules/circomlib/circuits/comparators.circom";
+include "../../node_modules/circomlib/circuits/multiplexer.circom";
 // include "https://github.com/0xPARC/circom-secp256k1/blob/master/circuits/bigint.circom";
 
 template OneBitVector(n){
@@ -100,8 +100,8 @@ template HideCard (maxCardsCount) {
 component main { public [ cards,card_count ] } = HideCard(10);
 
 /* INPUT = {
-    "cards": ["10","5","3","2","7","1","0","0","0","0"],
+    "cards": ["31","26","41","50","35","23","0","0","0","0"],
     "card_count": "6",
-    "current_card": "3",
+    "current_card": "41",
     "salt": "1234"
 } */

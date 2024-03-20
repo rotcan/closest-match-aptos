@@ -7,6 +7,7 @@ module closest_match::utils{
     use aptos_std::math64;
     use std::vector;
 
+    const EINVALID_SLICE_RANGE: u64 =20;
     //In group of 13s
     public(friend) fun get_card_difference(v1: u8, v2: u8): u8{
         let v1mod=v1%13;
@@ -28,4 +29,18 @@ module closest_match::utils{
         total
     }
      
+    public fun slice<Element: copy>(
+        v: &vector<Element>,
+        start: u64,
+        end: u64
+    ): vector<Element> {
+        assert!(start <= end && end <= vector::length(v), EINVALID_SLICE_RANGE);
+
+        let vec = vector[];
+        while (start < end) {
+            vector::push_back(&mut vec, *vector::borrow(v, start));
+            start = start + 1;
+        };
+        vec
+    }
 }

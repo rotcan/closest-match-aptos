@@ -27,7 +27,13 @@ module closest_match::game {
     const E_MATCH_ALREADY_ENDED: u64=13;
     const E_WAITING_FOR_OTHER_PLAYERS: u64=14;
     const E_MATCH_NOT_IN_PROGRESS: u64 =15;
-    
+    const E_ALREADY_PLAYED: u64=16;
+    const E_ALREADY_SCORED: u64 = 17;
+    const E_ROUND_NOT_FINISHED: u64 = 18;
+    const E_CANNOT_FINISH_MATCH: u64 = 19;
+    const E_LAST_ROUND_CANNOT_CALL: u64=20;
+    const E_ROUNDS_NOT_IN_RANGE: u64=21;
+
     //Play state enum
     const MATCH_SETUP: u8 = 1; //match setup
     // const MATCH_PLAYER_JOIN: u8 = MATCH_SETUP+1;
@@ -50,7 +56,7 @@ module closest_match::game {
     const MAX_PLAYERS: u8=4;
 
     const CARDS_PER_PLAYER: u8=6;
-    const ROUNDS: u8=3;
+    const ROUNDS: u8=6;
 
     use closest_match::mtc_coin;
     use closest_match::utils; 
@@ -70,14 +76,22 @@ module closest_match::game {
     
     const DUMMY_CARD_VALUE: u8 = 52;
 
+    const FEE_BASIS_POINTS: u64=20; //0.2pct
     //Events
     //Setup match
     //Start Match
+     #[event]
+    struct MatchStartEvent has drop, store {
+        match_id: u64,
+        owner: address,
+        match_address: address,
+    }
     //Match finish
     //Match forfeit
     //Round Finish
     #[event]
     struct MatchEvent has drop, store {
+        match_id: u64,
         owner: address,
         match_address: address,
         match_state: u8,
@@ -86,6 +100,7 @@ module closest_match::game {
     //Player Join
     #[event]
     struct PlayerJoinEvent has drop, store {
+        match_id: u64,
         owner: address,
         match_address: address,
         player_address: address,
@@ -121,11 +136,12 @@ module closest_match::game {
         max_time_between_moves: u64, //forfeit if player leaves before match finishes
         deck_cards: vector<u8>,
         table_cards: vector<u8>,
-        active_player: option::Option<address>,
+        //active_player: option::Option<address>,
         players: vector<address>,
         pot_value: u64,
         player_points: simple_map::SimpleMap<address, u8>,
         match_state: u8,
+        total_rounds: u8,
         //player_state: simple_map::SimpleMap<address, PlayerState>, //could use map
         game_state: GameState,
         winners: vector<address>,
@@ -144,7 +160,7 @@ module closest_match::game {
         //current round timestamp
         round_timestamp: u64,
         //player_state: vector<PlayerState>,
-
+        round_scored: u8,
     }
 
 
@@ -199,7 +215,10 @@ module closest_match::game {
         resource_address
     }
      
-    inline fun get_empty_state(creator: &signer, player_count: u8, move_time: u64,pot_value: u64, match_id : u64): MatchState{
+    inline fun get_empty_state(creator: &signer, player_count: u8, move_time: u64,pot_value: u64,rounds: u8, match_id : u64): MatchState{
+        
+        //let deck_cards=vector[35, 4,30,20,45,21,17,18,47,49, 6,34,33, 8, 7, 0,31,24, 5,13,15,36,16, 9,46,29,50,44,37,14,10,42,25,12,43,48,11, 1,39,41,51, 2,22,27,19, 3,28,26,23,32,38,40];      
+        //todo: uncomment this;
         let deck_cards=vector::empty();
         for (i in 0..52){
             vector::push_back(&mut deck_cards,i);
@@ -217,11 +236,12 @@ module closest_match::game {
             max_time_between_moves: move_time, //forfeit if player leaves before match finishes
             deck_cards,
             table_cards: vector::empty(),
-            active_player: option::none(),
+            //active_player: option::none(),
             players: vector::singleton<address>(creator_address),
             player_points: simple_map::new_from<address,u8>(vector[creator_address],vector[0]),
             match_state: MATCH_SETUP,
             pot_value,
+            total_rounds: rounds,
             winners: vector::empty(),
             //player_state: simple_map::SimpleMap<address, PlayerState>, //could use map
             game_state: GameState {
@@ -231,6 +251,7 @@ module closest_match::game {
                 cards_played: 0,
                 current_round_moves: simple_map::create<address,u8>(),
                 round_timestamp: 0,
+                round_scored:0,
                 // player_state: vector::empty(),
             },
             pool_cap: signer_cap,
@@ -240,6 +261,7 @@ module closest_match::game {
 
     inline fun get_resource_seed(player_address:address, match_id: u64,salt: vector<u8>):vector<u8>{
         let seed=bcs::to_bytes(&player_address);
+        vector::append(&mut seed,bcs::to_bytes(&@closest_match));
         vector::append(&mut seed,salt);
         vector::append(&mut seed,bcs::to_bytes(&match_id));
         seed
@@ -258,11 +280,14 @@ module closest_match::game {
             match_id:0
         });
     }
+
+
     //Setup match : num of players, pot size, 
     //Use fungible asset for tokens
     //At one time only one match will be active per player
-    public entry fun setup_match(sender: &signer, player_count: u8, move_time: u64, pot_value: u64) acquires MatchId{
+    public entry fun setup_match(sender: &signer, player_count: u8, move_time: u64, rounds: u8, pot_value: u64) acquires MatchId{
         //Create resource account
+        assert!(rounds >=3 && rounds <=ROUNDS, E_ROUNDS_NOT_IN_RANGE);
         let sender_address=signer::address_of(sender);
 
         let seed=get_resource_seed(@admin_addr,0,RESOURCE_ADDRESS_SEED_GLOBAL);
@@ -280,23 +305,20 @@ module closest_match::game {
         //let resource_address=signer::address_of(&resource);
         let signer_from_cap=account::create_signer_with_capability(&signer_cap);
 
-        let match=get_empty_state(sender,player_count,move_time,pot_value,match_id.match_id);
+        let match=get_empty_state(sender,player_count,move_time,pot_value,rounds,match_id.match_id);
         let pool_address=match.pool_address;
-        let match_state=match.match_state;
-        let game_state=match.game_state.game_state;
+        // let match_state=match.match_state;
+        // let game_state=match.game_state.game_state;
+        let current_match_id=match.match_id;
         move_to(&signer_from_cap,match);  
         
         
         //Create game pot
         if(pot_value > 0 ){
-            // let pool_seed=get_resource_seed(sender_address,match_id.match_id,RESOURCE_POOL_SEED);
-
-            // let (resource,signer_cap)=account::create_resource_account(sender,pool_seed);
-            // let resource_address=signer::address_of(&resource);
-            // let signer_from_cap=account::create_signer_with_capability(&signer_cap);
+            
             let coin_address=get_coin_address();
-            std::debug::print<u64>(&190);
-            std::debug::print<address>(&coin_address);
+            // std::debug::print<u64>(&190);
+            // std::debug::print<address>(&coin_address);
             mtc_coin::transfer_to(sender, coin_address, pool_address, pot_value);
         };
 
@@ -310,11 +332,12 @@ module closest_match::game {
         });
         
         match_id.match_id =match_id.match_id + 1;
-        let event = MatchEvent {
+        let event = MatchStartEvent {
+            match_id: current_match_id,
             owner: sender_address,
             match_address: check_resource_address,
-            match_state: match_state,
-            game_state: game_state,
+            // match_state: match_state,
+            // game_state: game_state,
         };
         0x1::event::emit(event);
     }
@@ -358,6 +381,7 @@ module closest_match::game {
             //match can start
             match_state.match_state=MATCH_START;
             let event = MatchEvent {
+                match_id: match_state.match_id,
                 owner: owner,
                 match_address: check_resource_address,
                 match_state: match_state.match_state,
@@ -366,6 +390,7 @@ module closest_match::game {
             0x1::event::emit(event);
         };
         let join_event = PlayerJoinEvent {
+            match_id: match_state.match_id,
             owner: owner,
             match_address: check_resource_address,
             player_address: sender_address,
@@ -373,12 +398,16 @@ module closest_match::game {
         0x1::event::emit(join_event);
     }
 
-    public entry fun draw_cards(owner: address, match_id: u64,) acquires PlayerState,MatchState{
+    public entry fun draw_cards(owner: address, match_id: u64,) 
+    acquires PlayerState,MatchState
+    {
         draw_cards_internal(owner,match_id);
     }
 
     #[randomness]
-    entry fun draw_cards_internal(owner: address, match_id: u64,) acquires PlayerState,MatchState{
+    entry fun draw_cards_internal(owner: address, match_id: u64,) 
+    acquires PlayerState,MatchState
+    {
         let match_seed=get_resource_seed(owner, match_id,RESOURCE_ADDRESS_SEED);
         let check_resource_address= account::create_resource_address(&owner, match_seed);
         assert!(account::exists_at(check_resource_address), error::permission_denied(E_MATCH_DOES_NOT_EXIST));
@@ -393,16 +422,17 @@ module closest_match::game {
             let resource_address=account::create_resource_address(player_address,seed);
             let player_state=borrow_global_mut<PlayerState>(resource_address);
             
-            player_state.player_cards=game_randomness::draw_cards(&mut match_state.deck_cards,CARDS_PER_PLAYER);
+            //todo: check CARDS_PER_PLAYER
+            player_state.player_cards=game_randomness::draw_cards(&mut match_state.deck_cards,match_state.total_rounds);
             // for (i in 0..CARDS_PER_PLAYER){
             //     let size= vector::length(&match_state.deck_cards) ;
             //     let card=randomness::u64_range(0, size);
             //     vector::push_back(&mut player_state.player_cards, vector::remove(&mut match_state.deck_cards,card));
             // };
-            std::debug::print<u16>(&272);
-            for (j in 0..vector::length(&player_state.player_cards)){
-                std::debug::print<u8>(vector::borrow(&player_state.player_cards,j));
-            };
+            //std::debug::print<u16>(&272);
+            // for (j in 0..vector::length(&player_state.player_cards)){
+            //     std::debug::print<u8>(vector::borrow(&player_state.player_cards,j));
+            // };
         };
         //draw card on table
         //let table_card: vector<u8> =vector::empty<u8>();
@@ -410,10 +440,10 @@ module closest_match::game {
         let table_card=game_randomness::draw_cards(&mut match_state.deck_cards,1);
         //vector::push_back(&mut match_state.table_cards,(table_card as u8));
         vector::append(&mut match_state.table_cards,table_card );
-        std::debug::print<u8>(vector::borrow(&match_state.table_cards,0));
+        // std::debug::print<u8>(vector::borrow(&match_state.table_cards,0));
         //Update match state
         match_state.game_state.game_state=GAME_PLAYER_HIDDEN_MOVE;
-        match_state.game_state.current_round=1;
+        //match_state.game_state.current_round=1;
         match_state.game_state.cards_played=0;
         match_state.game_state.round_timestamp=timestamp::now_seconds();
         match_state.match_state=MATCH_IN_PROGRESS;
@@ -441,8 +471,11 @@ module closest_match::game {
     proof_a: vector<u8>,
     proof_b: vector<u8>,
     proof_c: vector<u8>,match_address: address, player_address: address, match_state: &mut MatchState, player_state: &mut PlayerState )  {
+        
+        assert!(match_state.game_state.current_round < match_state.total_rounds-1, E_LAST_ROUND_CANNOT_CALL);
 
         assert!(match_state.match_state == MATCH_IN_PROGRESS, E_MATCH_NOT_IN_PROGRESS);
+
         //check timestamp
         let time_diff=timestamp::now_seconds() - match_state.game_state.round_timestamp ;
         if (time_diff > match_state.max_time_between_moves) {
@@ -450,28 +483,41 @@ module closest_match::game {
             forfeit_match(match_address,match_state);
             return
         };
+
+        assert!(!simple_map::contains_key(&match_state.game_state.current_round_moves, &player_address),E_ALREADY_PLAYED);
+        
+        //check for same card again
+        let secret_array=vector::map_ref(&player_state.player_moves, |e| {
+            let e: &PlayerMove=e;
+            e.secret
+        });
+
+        let hidden_value_vec=vector::borrow(&public_inputs,HC_HIDDEN_CARD_INDEX);
+        assert!(!vector::contains(&secret_array,hidden_value_vec), E_ALREADY_PLAYED);
         //verify proof
+        //todo: uncomment this
         assert!(groth16_prove::verify_hide_card_proof(public_inputs,proof_a,proof_b,proof_c)==true,E_PROOF_FAILED);   
         assert!(match_state.game_state.game_state==GAME_PLAYER_HIDDEN_MOVE,E_WAITING_FOR_OTHER_PLAYERS);
         //get public inputs
         //0 = hidden value
         //1-11 = cards
         //12 = card num
-        let hidden_value_vec=vector::borrow(&public_inputs,HC_HIDDEN_CARD_INDEX);
         //let hidden_value=utils::get_u64_from_vec_le(hidden_value_vec,32);
         let card_count_vec=vector::borrow(&public_inputs,HC_CARDS_COUNT_INDEX);
         let card_count=utils::get_u64_from_vec_le(card_count_vec,1);
          
-        let card_scalars=vector::slice(&public_inputs,HC_CARDS_START_INDEX,HC_CARDS_START_INDEX+card_count);
+        let card_scalars=utils::slice(&public_inputs,HC_CARDS_START_INDEX,HC_CARDS_START_INDEX+card_count);
         let cards: vector<u8> =vector::map_ref(&card_scalars, |e| (utils::get_u64_from_vec_le(e,1) as u8) );
         //match cards are same
         let player_cards=player_state.player_cards;
-        
+        // std::debug::print<u64>(&512);
+        // std::debug::print<vector<u8>>(&cards);
+        // std::debug::print<vector<u8>>(&player_cards);
         assert!(comparator::is_equal(&comparator::compare_u8_vector(cards,player_cards)),E_CARDS_MISMATCH);
         //verify same card is not played in show cards
         
         //check rounds match
-        assert!(vector::length(&player_state.player_moves)==(match_state.game_state.current_round-1 as u64), E_CANNOT_PLAY_MULTIPLE_CARDS_IN_SAME_ROUND);
+        assert!(vector::length(&player_state.player_moves)==(match_state.game_state.current_round as u64), E_CANNOT_PLAY_MULTIPLE_CARDS_IN_SAME_ROUND);
 
         let player_move=PlayerMove{secret: *hidden_value_vec, value: option::none()};
         vector::push_back(&mut player_state.player_moves,player_move);
@@ -484,7 +530,12 @@ module closest_match::game {
             match_state.game_state.game_state=GAME_PLAYER_REVEAL;
             match_state.game_state.cards_played=0;
             match_state.game_state.round_timestamp=timestamp::now_seconds();
-            simple_map::destroy(match_state.game_state.current_round_moves, |_e| {},|_e2| {});
+            //simple_map::destroy(match_state.game_state.current_round_moves, |_e| {},|_e2| {});
+            for (i in 0..vector::length(&match_state.players)){
+                let addr=vector::borrow(&match_state.players,i);
+                //clear round moves
+                let (_a,_val)=simple_map::remove<address,u8>(&mut match_state.game_state.current_round_moves, addr);
+            };
         };
 
         let event =   CardEvent {
@@ -519,7 +570,12 @@ module closest_match::game {
     proof_a: vector<u8>,
     proof_b: vector<u8>,
     proof_c: vector<u8>, match_address: address,  match_state: &mut MatchState, player_state: &mut PlayerState ){
+        //verify proof
+        //todo: uncomment this
+        assert!(groth16_prove::verify_show_card_proof(public_inputs,proof_a,proof_b,proof_c)==true,E_PROOF_FAILED);   
         assert!(match_state.match_state == MATCH_IN_PROGRESS, E_MATCH_NOT_IN_PROGRESS);
+        assert!(match_state.game_state.current_round < match_state.total_rounds-1, E_LAST_ROUND_CANNOT_CALL);
+
         //check timestamp
         let time_diff=timestamp::now_seconds() - match_state.game_state.round_timestamp ;
         if (time_diff > match_state.max_time_between_moves) {
@@ -528,8 +584,9 @@ module closest_match::game {
             return
         };
 
-        //verify proof
-        assert!(groth16_prove::verify_show_card_proof(public_inputs,proof_a,proof_b,proof_c)==true,E_PROOF_FAILED);   
+        assert!(!simple_map::contains_key(&match_state.game_state.current_round_moves, &player_address),E_ALREADY_PLAYED);
+        
+
         
         assert!(match_state.game_state.game_state==GAME_PLAYER_REVEAL,E_WAITING_FOR_OTHER_PLAYERS);
         //get public inputs
@@ -546,56 +603,32 @@ module closest_match::game {
         let card_value_vec=vector::borrow(&public_inputs,SC_CARD_INDEX );
         let card_value=(utils::get_u64_from_vec_le(card_value_vec,1) as u8);
 
-        let card_scalars=vector::slice(&public_inputs,SC_CARDS_START_INDEX,SC_CARDS_START_INDEX+card_count);
+        let card_scalars=utils::slice(&public_inputs,SC_CARDS_START_INDEX,SC_CARDS_START_INDEX+card_count);
         let cards: vector<u8> =vector::map_ref(&card_scalars, |e| (utils::get_u64_from_vec_le(e,1) as u8) );
         //match cards are same
         assert!(comparator::is_equal(&comparator::compare_u8_vector(cards,player_cards)),E_CARDS_MISMATCH);
 
         //verify card is in players hand
         assert!(vector::contains(&player_cards,&card_value ), E_REVEAL_CARD_NOT_PRESENT);
-        
-        player_move.value=option::some<u8>(card_value);
-        vector::push_back(&mut player_state.player_moves, player_move);
-
+        //verify card is not played before
         let played_cards: vector<u8> =vector::map_ref(&player_state.player_moves, |e| {
             let e: &PlayerMove = e;
             *option::borrow(&e.value)
         });
-        //verify card is not played before
-        assert!(vector::contains(&played_cards,&card_value ), E_REVEAL_CARD_PLAYED_AGAIN);
+        // std::debug::print<u64>(&609);
+        // std::debug::print<vector<u8>>(&played_cards);
+        assert!(!vector::contains(&played_cards,&card_value ), E_REVEAL_CARD_PLAYED_AGAIN);
         
+        player_move.value=option::some<u8>(card_value);
+        vector::push_back(&mut player_state.player_moves, player_move);
+
+       
         match_state.game_state.cards_played=match_state.game_state.cards_played+1;
         simple_map::add<address,u8>(&mut match_state.game_state.current_round_moves, player_address, card_value);
 
         let round=match_state.game_state.current_round;
 
-        //update match if all players revealed the card
-        if(match_state.game_state.cards_played==match_state.player_count){
-            let current_round=match_state.game_state.current_round;
-            //update state to show cards
-            match_state.game_state.game_state=GAME_PLAYER_HIDDEN_MOVE;
-            match_state.game_state.cards_played=0;
-            match_state.game_state.current_round=current_round+1;
-            match_state.game_state.round_timestamp=timestamp::now_seconds();
-        
-            //score round
-            let table_card=vector::borrow(&match_state.table_cards,vector::length(&match_state.table_cards)-1);
-            //get players round cards
-            let player_moves:vector<u8> = vector::empty();
-            for (i in 0..vector::length(&match_state.players)){
-                let addr=vector::borrow(&match_state.players,i);
-                //clear round moves
-                let (_a,val)=simple_map::remove<address,u8>(&mut match_state.game_state.current_round_moves, addr);
-                vector::push_back(&mut player_moves, val);
-            };
-            //score 
-            score_round(match_state, *table_card,player_moves );
-            
-            //check match finish
-            if (match_state.game_state.current_round==ROUNDS) {
-                match_finish( match_address, match_state);
-            };
-        };
+        //round_finish_internal(match_address,match_state);
 
         let event =   CardEvent {
             owner: match_state.owner,
@@ -607,6 +640,129 @@ module closest_match::game {
          0x1::event::emit(event);
     }
 
+    public entry fun round_finish(owner: address, match_id: u64,) acquires MatchState{
+        let match_seed=get_resource_seed(owner, match_id,RESOURCE_ADDRESS_SEED);
+        let check_resource_address= account::create_resource_address(&owner, match_seed);
+        assert!(account::exists_at(check_resource_address), error::permission_denied(E_MATCH_DOES_NOT_EXIST));
+        
+        round_finish_internal(check_resource_address);
+    }
+
+    public entry fun last_round(owner: address, match_id: u64, player_cards: vector<u8>) acquires MatchState,PlayerState{
+        let match_seed=get_resource_seed(owner, match_id,RESOURCE_ADDRESS_SEED);
+        let check_resource_address= account::create_resource_address(&owner, match_seed);
+        assert!(account::exists_at(check_resource_address), error::permission_denied(E_MATCH_DOES_NOT_EXIST));
+        let match_state=borrow_global_mut<MatchState>(check_resource_address);
+
+        last_round_internal(check_resource_address,match_state,player_cards);
+    }
+
+    fun last_round_internal(match_address: address, match_state: &mut MatchState,  player_cards: vector<u8>) acquires PlayerState{
+        
+        assert!(match_state.game_state.current_round==match_state.total_rounds-1, E_CANNOT_FINISH_MATCH);
+        
+        for (i in 0..vector::length(&match_state.players)) {
+            let player_address=vector::borrow(&match_state.players,i);
+            let seed=get_resource_seed(*player_address,match_state.match_id,RESOURCE_ADDRESS_SEED_PLAYERS);
+            let resource_address=account::create_resource_address(player_address,seed);
+            let player_state=borrow_global_mut<PlayerState>(resource_address);
+            let card_value=vector::borrow(&player_cards,i);
+
+             //verify card is in players hand
+            assert!(vector::contains(&player_state.player_cards,card_value ), E_REVEAL_CARD_NOT_PRESENT);
+            //Not already played
+            let played_cards: vector<u8> =vector::map_ref(&player_state.player_moves, |e| {
+                let e: &PlayerMove = e;
+                *option::borrow(&e.value)
+            });
+            // std::debug::print<u64>(&676);
+            // std::debug::print<u8>(card_value);
+            // std::debug::print<vector<u8>>(&played_cards);
+            assert!(!vector::contains(&played_cards,card_value ), E_REVEAL_CARD_PLAYED_AGAIN);
+            //Not add to player moves
+            let player_move=PlayerMove{secret: vector[], value: option::some<u8>(*card_value)};
+            vector::push_back(&mut player_state.player_moves, player_move);
+
+            match_state.game_state.cards_played=match_state.game_state.cards_played+1;
+            simple_map::add<address,u8>(&mut match_state.game_state.current_round_moves, *player_address, *card_value);
+
+        };
+      
+         //update round
+        round_finish_update_internal(match_state);
+
+        //finish match
+        match_finish( match_address, match_state);
+    }
+
+
+    #[randomness]
+    entry fun round_finish_internal(match_address: address)  acquires MatchState{
+        //update match if all players revealed the card
+        let match_state=borrow_global_mut<MatchState>(match_address);
+        assert!(match_state.game_state.current_round<match_state.total_rounds, E_LAST_ROUND_CANNOT_CALL);
+        // assert!(match_state.game_state.cards_played==match_state.player_count, E_ROUND_NOT_FINISHED );
+
+        // let current_round=match_state.game_state.current_round;
+        // //update state to hide cards
+        // match_state.game_state.game_state=GAME_PLAYER_HIDDEN_MOVE;
+        // match_state.game_state.cards_played=0;
+        // match_state.game_state.current_round=current_round+1;
+        // match_state.game_state.round_timestamp=timestamp::now_seconds();
+    
+        // //score round
+        // let table_card=vector::borrow(&match_state.table_cards,vector::length(&match_state.table_cards)-1);
+        // //get players round cards
+        // let player_moves:vector<u8> = vector::empty();
+        // for (i in 0..vector::length(&match_state.players)){
+        //     let addr=vector::borrow(&match_state.players,i);
+        //     //clear round moves
+        //     let (_a,val)=simple_map::remove<address,u8>(&mut match_state.game_state.current_round_moves, addr);
+        //     vector::push_back(&mut player_moves, val);
+        // };
+        // //score 
+        // score_round(match_state, *table_card,player_moves );
+        round_finish_update_internal(match_state);
+        
+        //check match finish
+        // if (match_state.game_state.current_round==ROUNDS+1) {
+        //     match_finish( match_address, match_state);
+        // }else{
+        let new_table_card=game_randomness::draw_cards(&mut match_state.deck_cards,1);
+        //vector::push_back(&mut match_state.table_cards,(table_card as u8));
+        vector::append(&mut match_state.table_cards,new_table_card );
+        // };
+       
+    }
+
+    
+    fun round_finish_update_internal(match_state: &mut MatchState){
+        assert!(match_state.game_state.cards_played==match_state.player_count, E_ROUND_NOT_FINISHED );
+        
+        let current_round=match_state.game_state.current_round;
+        //update state to hide cards
+        match_state.game_state.game_state=GAME_PLAYER_HIDDEN_MOVE;
+        match_state.game_state.cards_played=0;
+        match_state.game_state.current_round=current_round+1;
+        match_state.game_state.round_timestamp=timestamp::now_seconds();
+    
+        //score round
+        let table_card=vector::borrow(&match_state.table_cards,vector::length(&match_state.table_cards)-1);
+        //get players round cards
+        let player_moves:vector<u8> = vector::empty();
+        for (i in 0..vector::length(&match_state.players)){
+            let addr=vector::borrow(&match_state.players,i);
+            //clear round moves
+            let (_a,val)=simple_map::remove<address,u8>(&mut match_state.game_state.current_round_moves, addr);
+            vector::push_back(&mut player_moves, val);
+        };
+        //score 
+        // std::debug::print<u64>(&707);
+        // std::debug::print<u8>(&match_state.game_state.current_round);
+        // std::debug::print<u8>(&match_state.game_state.round_scored);
+        score_round(match_state, *table_card,player_moves );
+ 
+    }
 
     fun score_round(match_state: &mut MatchState, table_card: u8, player_cards: vector<u8>){
         let players=match_state.players;
@@ -614,26 +770,37 @@ module closest_match::game {
         let first_addr=vector::borrow(&players,0);
         let first_pc=vector::borrow(&player_cards,0);
         vector::push_back(&mut winners,RoundScoring{player: *first_addr, diff: utils::get_card_difference(table_card, *first_pc)});
+        assert!(match_state.game_state.round_scored == match_state.game_state.current_round-1, E_ALREADY_SCORED);
+        //std::debug::print<u64>(&10000);
+        //std::debug::print<u8>(&utils::get_card_difference(table_card, *first_pc));
         for (i in 1..vector::length(&players)){
             let second_addr=vector::borrow(&players,i);
             let second_pc=vector::borrow(&player_cards,i);
 
             let winner =vector::borrow_mut(&mut winners, 0);
             let diff=utils::get_card_difference(table_card, *second_pc);
+        
             if (diff < winner.diff){
                 //new array
                 winners=vector::singleton(RoundScoring{player: *second_addr,diff});
-            }else{
+            }else  if (diff == winner.diff){
                 //append
-                vector::push_back(&mut winners,RoundScoring{player: *first_addr, diff: utils::get_card_difference(table_card, *first_pc)});
-            }
+                vector::push_back(&mut winners,RoundScoring{player: *second_addr, diff: diff});
+            };
+            
+        };
+
+        let winner_point = if (vector::length(&winners) == 1){
+            3
+        }else{
+            1
         };
 
         for (i in 0..vector::length(&winners)){
             let points=simple_map::borrow_mut(&mut match_state.player_points, &vector::borrow(&winners,i).player);
-            *points=*points + 1;
+            *points=*points + winner_point;
         };
-
+        match_state.game_state.round_scored=match_state.game_state.current_round;
     }
  
     
@@ -670,9 +837,11 @@ module closest_match::game {
             e.player
         });
 
+        // std::debug::print<vector<address>>(&match_state.winners);
         disburse_money(match_state);
 
         let event = MatchEvent {
+            match_id: match_state.match_id,
             owner: match_state.owner,
             match_address: match_address,
             match_state: match_state.match_state,
@@ -682,21 +851,26 @@ module closest_match::game {
     }
 
     fun disburse_money( match_state: &mut MatchState){
-        let pot_value=match_state.pot_value;
+        let coin_address=get_coin_address();
+        let pot_value=mtc_coin::balance(match_state.pool_address,coin_address);
         //disburse money
         if(pot_value > 0 ){
-            let coin_address=get_coin_address();
+            let fees=FEE_BASIS_POINTS * pot_value/ 10000;
+
             let winner_count=vector::length(&match_state.winners);
-            let winner_pot_value=pot_value / winner_count;
+            let winner_pot_value=(pot_value-fees) / winner_count;
             let signer_cap=account::create_signer_with_capability(&match_state.pool_cap);
             for (i in 0..winner_count){
                 let addr=vector::borrow(&match_state.winners,i);
                 //sender is resrouce signer
                 mtc_coin::transfer_to(&signer_cap, coin_address, *addr, winner_pot_value);
             };
+            //Transfer fees to treasury
+            mtc_coin::transfer_to(&signer_cap, coin_address, @treasury_addr, fees);
         };
     }
 
+     
     
     fun forfeit_match(match_address: address, match_state: &mut MatchState){
         match_state.match_state=MATCH_FORFEIT;
@@ -719,6 +893,7 @@ module closest_match::game {
         disburse_money(match_state);
 
         let event = MatchEvent {
+            match_id: match_state.match_id,
             owner: match_state.owner,
             match_address: match_address,
             match_state: match_state.match_state,
@@ -742,8 +917,8 @@ module closest_match::game {
     }
 
     #[test_only]
-    public fun setup_match_test(player1: &signer, player_count: u8,move_time: u64,pot_value: u64) acquires MatchId{
-        setup_match(player1,player_count,move_time,pot_value);
+    public fun setup_match_test(player1: &signer, player_count: u8,move_time: u64,rounds: u8,pot_value: u64, ) acquires MatchId{
+        setup_match(player1,player_count,move_time,rounds,pot_value);
     }
 
     #[test_only]
@@ -759,6 +934,39 @@ module closest_match::game {
         //let check_resource_address= account::create_resource_address(&owner, match_seed);
 
         draw_cards_internal(owner,match_id);
+        
+    }
+
+    #[test_only]
+    public fun round_finish_test(  owner: address, match_id: u64) 
+    acquires MatchState
+    {
+        //let match_seed=get_resource_seed(owner, match_id,RESOURCE_ADDRESS_SEED);
+        //let check_resource_address= account::create_resource_address(&owner, match_seed);
+
+        round_finish(owner,match_id);
+        
+    }
+
+     #[test_only]
+    public fun score_round_test(  owner: address, match_id: u64) 
+    acquires MatchState
+    {
+        let match_seed=get_resource_seed(owner, match_id,RESOURCE_ADDRESS_SEED);
+        let match_address= account::create_resource_address(&owner, match_seed);
+        let match_state=borrow_global_mut<MatchState>(match_address);
+        score_round(match_state,30,vector[22,41,19]);
+        
+    }
+
+     #[test_only]
+    public fun last_round_test(  owner: address, match_id: u64, cards: vector<u8>) 
+    acquires MatchState, PlayerState
+    {
+        //let match_seed=get_resource_seed(owner, match_id,RESOURCE_ADDRESS_SEED);
+        //let check_resource_address= account::create_resource_address(&owner, match_seed);
+
+        last_round(owner,match_id,vector[]);
         
     }
 

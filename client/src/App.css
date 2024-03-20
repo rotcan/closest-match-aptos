@@ -1,0 +1,254 @@
+html, body { 
+  height: 100%;
+ }
+
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+.expired-notice {
+  text-align: center;
+  /* padding: 0.5rem; */
+  /* border: 1px solid #ebebeb;
+  border-radius: 0.25rem; */
+}
+
+.expired-notice > span {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: red;
+}
+
+.expired-notice > p {
+  font-size: 1.5rem;
+}
+
+.show-counter, .show-counter .countdown-link {
+  /* padding: 0.5rem; */
+  height: 40px;
+}
+
+.show-counter .countdown-link {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  font-weight: 700;
+  /* font-size: 1.25rem;
+  line-height: 1.75rem;
+  padding: 0.5rem;
+  border: 1px solid #ebebeb;
+  border-radius: 0.25rem; */
+  text-decoration: none;
+  color: #000;
+}
+
+.show-counter .countdown {
+  /* line-height: 1.25rem;
+  padding:0 0.25rem 0 0.25rem; */
+  padding: 0px 0.5em;
+  line-height: 20px;
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.show-counter .countdown.danger {
+  color: #ff0000;
+}
+
+
+.show-counter .countdown > p,.show-counter .countdown.danger > p {
+  margin: 0;
+}
+
+.show-counter .countdown > span {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+
+.playing-card { 
+  margin:2px;
+  width: 40px;
+  height: auto;
+}
+.selected{
+   box-shadow:0px 2px 2px 1px #55695d; border:solid 1px #bbb;
+}
+
+a.nostyle:link {
+  text-decoration: inherit;
+  color: inherit;
+   
+}
+
+a.nostyle:visited {
+  text-decoration: inherit;
+  color: inherit;
+   
+}
+
+.header{
+  background-color: #ffdb58 ;
+  height: 80px;
+}
+
+.body{
+  height:  calc(99.5% - 80px);
+  background-color: #fff8df;
+}
+
+.full-width-m1 {
+  width: 100%;
+}
+.full-height{
+  height: 100%;
+}
+
+.full-width{
+  width: 100%;
+}
+
+.button-color{
+  background-color: #587CFF;
+}
+
+
+
+.game-form{
+  width: 500px;
+  margin: 0px auto;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px dotted #ffdb57;
+}
+
+.list-form{
+  width: 800px;
+}
+
+ .row{
+  margin:10px 0px;
+}
+
+.title{
+  display: flex;
+  align-items: center;
+}
+
+.game-status-row{
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border-bottom: 1px dotted #ffdb57;
+  background-color: #fefefe;
+}
+
+.score-title{
+  font-weight: 600;
+}
+
+.border-bottom{
+  border-bottom: 1px dotted #ffdb57;
+}
+
+.deck{
+  width: 300px;
+  height: 250px; 
+   border: 1px dotted #ccc; 
+   background-color: rgb(81 199 223);
+   border-radius: 5px;
+}
+
+.deck-history{
+  width: 300px;
+  height: 80px;
+  border: 1px dotted rgb(204, 204, 204);
+  background-color: rgb(65 162 181);
+  border-radius: 5px;
+}
+
+.deck-history img{
+  margin-top: 2px;
+  border-radius: 5px;
+}
+
+
+.game-screen{
+  width: 100%;
+  height: 100%;
+  
+  background-color: rgb(229 133 133);
+} 
+
+.padding-row{
+  padding:0px 10px;
+}
+
+a{
+  color:#0a3b7f;
+}
+a:hover{
+  color: #fff;
+}
+
+.list-form a:hover{
+  color: #675411;
+}
+
+.winner-icon{
+  padding-left:10px;
+  color:#ffdb57;
+  scale: 2;
+}
+
+.logo{
+  width: 40px;
+}
+
+.logo img{
+  width: 100%;
+  height: auto;
+}
+
+.main-menu{
+  overflow: hidden;
+}

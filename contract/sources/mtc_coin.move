@@ -18,6 +18,7 @@ module closest_match::mtc_coin {
     const PROJECT_URI: vector<u8> = b"https://rotcan.github.io/";
     
     const E_ADMIN_ADDRESS_MISMATCH: u64=1;
+    const E_AIRDROP_NOT_ALLOWED: u64=2;
  
     struct MtcRef has key{
         mint_ref: option::Option<fungible_asset::MintRef>,
@@ -26,6 +27,12 @@ module closest_match::mtc_coin {
     }
 
     struct MtcToken has key {}
+
+    struct AdminAccount has key{
+        resource_address: address,
+        signer_cap: account::SignerCapability,
+        allow_airdrop: bool,
+    }
 
     fun init_module(admin: &signer){
         let admin_address=signer::address_of(admin);
@@ -46,7 +53,16 @@ module closest_match::mtc_coin {
             string::utf8(PROJECT_URI),
         );   
 
-        move_to(admin, MtcRef{
+        let (resource_signer, signer_cap) = account::create_resource_account(admin,COIN_NAME);
+        let resource_signer_from_cap=account::create_signer_with_capability(&signer_cap);
+        
+        move_to(admin, AdminAccount{
+            resource_address : signer::address_of(&resource_signer),
+            signer_cap: signer_cap,
+            allow_airdrop: true,
+        });
+
+        move_to(&resource_signer_from_cap, MtcRef{
             mint_ref: option::some(fungible_asset::generate_mint_ref(&creator_ref)),
             burn_ref: option::some(fungible_asset::generate_burn_ref(&creator_ref)),
             transfer_ref:  option::some(fungible_asset::generate_transfer_ref(&creator_ref))
@@ -59,6 +75,14 @@ module closest_match::mtc_coin {
         let mtc_ref=borrow_global<MtcRef>(admin_address);
         // let coin_address=object::create_object_address(&admin_address,COIN_TITLE);
         // let mtc_obj=object::address_to_object<MtcToken>(coin_address);
+        assert!(account::exists_at(to_address),error::permission_denied(ERROR_ACCOUNT_DOES_NOT_EXIST));
+        primary_fungible_store::mint(option::borrow(&mtc_ref.mint_ref), to_address,amount)
+    }
+
+    public entry fun airdrop(to_address: address, amount: u64) acquires MtcRef, AdminAccount{
+        let admin_account=borrow_global<AdminAccount>(@admin_addr);
+        assert!(admin_account.allow_airdrop, E_AIRDROP_NOT_ALLOWED);
+        let mtc_ref=borrow_global<MtcRef>(admin_account.resource_address);
         assert!(account::exists_at(to_address),error::permission_denied(ERROR_ACCOUNT_DOES_NOT_EXIST));
         primary_fungible_store::mint(option::borrow(&mtc_ref.mint_ref), to_address,amount)
     }
@@ -77,6 +101,7 @@ module closest_match::mtc_coin {
         primary_fungible_store::balance(wallet, mtc_obj)
     }
 
+    #[view]
     public fun get_coin_address(): address{
         object::create_object_address(&@admin_addr, COIN_TITLE)
     }
@@ -89,10 +114,11 @@ module closest_match::mtc_coin {
     }
 
     #[test_only]
-    public fun mint_coins(admin: &signer,to_addr: address, val: u64) acquires MtcRef{
+    public fun mint_coins( to_addr: address, val: u64) acquires MtcRef,AdminAccount{
         //let coin_address=object::create_object_address(&signer::address_of(admin),COIN_TITLE);
         //std::debug::print<address>(&coin_address);
-        mint_to(admin, to_addr, val);
+        //mint_to(admin, to_addr, val);
+        airdrop( to_addr, val);
     }
 
     #[test_only]
@@ -103,7 +129,7 @@ module closest_match::mtc_coin {
     }
 
     #[test(admin=@0x123,bob=@0x345, alice=@0x234)]
-    public fun test_transfer(admin: &signer, bob: &signer, alice: &signer) acquires MtcRef{
+    public fun test_transfer(admin: &signer, bob: &signer, alice: &signer) acquires MtcRef,AdminAccount{
         create_account_for_test(signer::address_of(admin));
         create_account_for_test(signer::address_of(bob));
         create_account_for_test(signer::address_of(alice));
@@ -114,12 +140,12 @@ module closest_match::mtc_coin {
         //let mtc_ref=borrow_global<MtcRef>(admin_address);
         let mtc_obj = object::address_to_object<MtcToken>(coin_address);
         //primary_fungible_store::mint(option::borrow(&mtc_ref.mint_ref),admin_address,100);
-        mint_to(admin, admin_address, 100);
+        airdrop( admin_address, 100);
         assert!(primary_fungible_store::balance(admin_address,mtc_obj) == 100, 1);
         primary_fungible_store::transfer(admin, mtc_obj, signer::address_of(bob), 25);
         assert!(primary_fungible_store::balance(admin_address,mtc_obj) == 75, 2);
         assert!(primary_fungible_store::balance(signer::address_of(bob),mtc_obj) == 25, 3);
-        mint_to(admin, signer::address_of(alice), 120);
+        airdrop( signer::address_of(alice), 120);
         assert!(primary_fungible_store::balance(signer::address_of(alice),mtc_obj) == 120, 4);
     }
 }

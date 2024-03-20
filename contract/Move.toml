@@ -3,8 +3,10 @@ name = "ClosestMatch"
 version = "0.0.1"
 
 [dependencies]
-AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "mainnet" }
+AptosFramework = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-framework", rev = "main" }
+AptosStdlib = { git = "https://github.com/aptos-labs/aptos-core.git", subdir = "aptos-move/framework/aptos-stdlib", rev = "main" }
 
 [addresses]
-aptos_framework = "0x1"
-closest_match="0x123"
+closest_match="0x5de4d9c3e8675e40ab3440b346f98b91fd5e5ce8a379b9fc9d5a5224a9837a96"
+admin_addr="0x5de4d9c3e8675e40ab3440b346f98b91fd5e5ce8a379b9fc9d5a5224a9837a96"
+treasury_addr="0x7ebf17657d85c7c17042d0e42129df217150193a83a8b4c3c6e042fd861b23bf"

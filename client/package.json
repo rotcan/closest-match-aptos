@@ -1,0 +1,72 @@
+{
+  "name": "closest-match",
+  "version": "0.1.0",
+  "homepage": "https://rotcan.github.io/closest-match-aptos",
+  "private": true,
+  "dependencies": {
+    "@ant-design/icons": "^5.3.4",
+    "@aptos-labs/wallet-adapter-ant-design": "^2.0.0",
+    "@aptos-labs/wallet-adapter-react": "^2.1.8",
+    "@noble/curves": "^1.3.0",
+    "@testing-library/jest-dom": "^5.17.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^13.5.0",
+    "@types/jest": "^27.5.2",
+    "@types/node": "^16.18.87",
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "antd": "^5.10.0",
+    "bourbon": "^7.3.0",
+    "buffer": "^6.0.3",
+    "circomlib": "^2.0.5",
+    "crypto-browserify": "^3.12.0",
+    "fastfile": "^0.0.20",
+    "ffjavascript-browser": "^0.0.3",
+    "fs": "^0.0.1-security",
+    "gh-pages": "^6.1.1",
+    "graphql-request": "^6.1.0",
+    "hide-card-wasm": "file:./files/hide_card.wasm",
+    "hide-card-zk": "file:./files/hide_card_0001.zkey",
+    "node-polyfill-webpack-plugin": "^3.0.0",
+    "object-hash": "^3.0.0",
+    "petra-plugin-wallet-adapter": "^0.4.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3",
+    "react-scripts": "5.0.1",
+    "sass": "^1.72.0",
+    "snarkjs": "^0.7.3",
+    "typescript": "^4.9.5",
+    "web-vitals": "^2.1.4"
+  },
+  "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/webpack-env": "^1.18.4",
+    "react-app-rewired": "^2.2.1"
+  }
+}

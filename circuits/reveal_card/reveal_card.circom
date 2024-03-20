@@ -1,8 +1,8 @@
 pragma circom 2.1.6;
 
-include "circomlib/poseidon.circom";
-include "circomlib/comparators.circom";
-include "circomlib/multiplexer.circom";
+include "../../node_modules/circomlib/circuits/poseidon.circom";
+include "../../node_modules/circomlib/circuits/comparators.circom";
+include "../../node_modules/circomlib/circuits/multiplexer.circom";
 // include "https://github.com/0xPARC/circom-secp256k1/blob/master/circuits/bigint.circom";
 
 template OneBitVector(n){
@@ -98,7 +98,7 @@ template RevealCard (maxCardsCount) {
     // log("hash", hash.out);
 }
 
-component main { public [ cards,card_count,in_hash ] } = RevealCard(10);
+component main { public [ cards,card_count,in_hash,current_card ] } = RevealCard(10);
 
 /* INPUT = {
     "cards": ["10","5","3","2","7","1","0","0","0","0"],
